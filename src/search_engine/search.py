@@ -141,3 +141,5 @@ if __name__ == "__main__":
     all_songs = sh.search_all('半岛铁盒', limit=5)
     # 调用 download 方法，它会先让用户选择再进行下载
     sh.download(all_songs)
+
+    #命令行输入会阻塞，导致ui界面卡死
