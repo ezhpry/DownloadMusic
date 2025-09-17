@@ -2,7 +2,7 @@ import json
 import requests
 import os
 import re
-from typing import List, Dict, Optional, Callable
+from typing import List, Optional, Callable
 
 def printa(data):
     print("数据：", data)
@@ -17,7 +17,7 @@ class SearchEngine:
     """
     def __init__(self):
         try:
-            with open('search_api.json', 'r', encoding='utf-8') as f:
+            with open('config/search_api.json', 'r', encoding='utf-8') as f:
                 self.data = json.load(f)
             self.url = self.data['url']
         except FileNotFoundError:
@@ -55,7 +55,7 @@ class SearchEngine:
             return search_result['data'][0]['id']
         except (KeyError, IndexError):
             raise Exception("搜索结果格式异常")
-    
+
     def get_all_songIds(self, search_result: dict) -> List[str]:
         """
         获取所有搜索到的歌曲ID列表
@@ -80,10 +80,10 @@ class SearchEngine:
             response = requests.get(url, timeout=10)
             response.raise_for_status()
             resp = response.json()
-            
+
             if not resp.get('data'):
                 raise Exception("获取歌曲信息失败")
-                
+
             return {
                 'id': song_id,
                 'song': resp['data'].get('song', '未知歌曲'),
@@ -109,7 +109,7 @@ class SearchEngine:
             song_info = self.search_song_byId(song_id)
             return song_info
         return None
-        
+
     def search_all(self, keyword: str, limit: int = 10) -> List[dict]:
         """
         搜索所有匹配的歌曲信息
@@ -121,13 +121,13 @@ class SearchEngine:
             # 获取搜索结果
             search_result = self.search_by_word(keyword)
             song_ids = self.get_all_songIds(search_result)
-                
+
             if not song_ids:
                 return []
-                
+
             # 限制返回数量
             song_ids = song_ids[:limit]
-                
+
             # 获取每首歌曲的详细信息
             songs_info = []
             for song_id in song_ids:
@@ -137,9 +137,9 @@ class SearchEngine:
                 except Exception as e:
                     print(f"获取歌曲 {song_id} 信息失败: {str(e)}")
                     continue
-                
+
             return songs_info
-                
+
         except Exception as e:
             print(f"搜索失败: {str(e)}")
             return []
@@ -157,8 +157,8 @@ class SearchEngine:
         filename = filename.strip('. ')
         # 限制长度
         return filename[:100] if len(filename) > 100 else filename
-        
-    def download(self, song_info: dict, save_path: str = './', 
+
+    def download(self, song_info: dict, save_path: str = './downloads',
                 progress_callback: Optional[Callable[[int, int], None]] = None) -> str:
         """
         下载歌曲
@@ -170,41 +170,41 @@ class SearchEngine:
         song_name = song_info.get('song', '未知歌曲')
         song_singer = song_info.get('singer', '未知歌手')
         song_url = song_info.get('url', '')
-        
+
         if not song_url:
             raise Exception("歌曲下载链接无效")
-        
+
         # 清理文件名
         safe_song_name = self._sanitize_filename(song_name)
         safe_singer_name = self._sanitize_filename(song_singer)
         filename = f"{safe_song_name}-{safe_singer_name}.flac"
-        
+
         # 确保保存目录存在
         if not os.path.exists(save_path):
             os.makedirs(save_path)
-        
+
         file_path = os.path.join(save_path, filename)
-        
+
         try:
             response = requests.get(song_url, stream=True, timeout=30)
             response.raise_for_status()
-            
+
             total_size = int(response.headers.get('content-length', 0))
             downloaded_size = 0
-            
+
             with open(file_path, 'wb') as f:
                 for chunk in response.iter_content(chunk_size=8192):
                     if chunk:
                         f.write(chunk)
                         downloaded_size += len(chunk)
-                        
+
                         # 调用进度回调
                         if progress_callback:
                             progress_callback(downloaded_size, total_size)
-            
+
             print(f'[*]下载成功: {song_name} - {song_singer}.flac')
             return file_path
-            
+
         except requests.exceptions.RequestException as e:
             if os.path.exists(file_path):
                 os.remove(file_path)  # 删除不完整的文件
@@ -217,16 +217,17 @@ class SearchEngine:
 # 使用示例
 if __name__ == "__main__":
     sh = SearchEngine()
-    
-    # 搜索第一首歌曲
-    song_info = sh.search('半岛铁盒')
-    if song_info:
-        print(f"找到歌曲: {song_info['song']} - {song_info['singer']}")
-        # sh.download(song_info, save_path='./')
-    
+
+    # # 搜索第一首歌曲
+    # song_info = sh.search('半岛铁盒')
+    # if song_info:
+    #     print(f"找到歌曲: {song_info['song']} - {song_info['singer']}")
+    #     # sh.download(song_info, save_path='./')
+
     # 搜索所有相关歌曲
-    all_songs = sh.search_all('半岛铁盒', limit=5)
+    all_songs = sh.search_all('美瞳', limit=5)
     print(f"\n找到 {len(all_songs)} 首相关歌曲:")
     for i, song in enumerate(all_songs, 1):
         print(f"{i}. {song['song']} - {song['singer']}")
+        sh.download(song, save_path='./')
 
